@@ -1,0 +1,4 @@
+jQuery: https://jquery.org/license/
+jQueryui: https://jquery.org/license/
+jQuery-switchButton: https://github.com/olance/jQuery-switchButton
+farbtastic: https://github.com/mattfarina/farbtastic/blob/master/LICENSE.txt

@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8">
+		<title>Glow</title>
+		<link rel="stylesheet" type="text/css" href="jquery-ui.min.css"/>
+		<link rel="stylesheet" type="text/css" href="jquery.switchButton.css"/>
+		<link rel="stylesheet" type="text/css" href="farbtastic.css"/>
+		<link rel="stylesheet" type="text/css" href="Glow.css"/>
+	</head>
+	<body>
+		<div class="navbar noselect" onmousedown="StartDragWindow();" onmouseup="EndDragWindow();">
+			<a href="Glow.html">Glow</a><a href="#" onclick="Close();" style="float: right; margin-right: 15px;">x</a>
+		</div>
+		<div class="content">
+			<div class="right-column">
+				<div class="ohyesh">
+					<div id ="colordiv">
+						<form>
+							<input type="text" id="color" name="color" value="#FF0000" /></form>
+							<div id="colorpicker"></div>
+						</form>
+						<button style="width: 90%; margin-left: 5%; margin-top: 10px;">Reset to default color</button>
+					</div>
+					
+					<div id ="intensity" style="margin-top: 2px; height: 53px;">
+						<a id="global" style="margin: 10px;">Global Intensity</a>
+						<div id="master" style="width:184px; margin:10px; opacity: 0.8;"></div>
+					</div>
+					
+					<div id = "intensity" style="margin-top: 2px; height: 54px;">
+						<a id="global" style="margin: 10px;">Animated Transitions</a>
+						<div class="switch-wrapper">
+						  <input type="checkbox">
+						</div>
+					</div>
+					
+				</div>
+			</div>
+			<div class="left-column">
+				<div id="scroll">
+					<a id="log" style="color:#fff"></a>
+					<ul id="actions" class="sortable noselect">
+					</ul>
+					<h1 class="ohnoes">Oh noes!</h1>
+					<h2 class="ohnoes">You have no addons requesting access to glow.</h2>
+				</div>
+
+			</div>			
+		<div>
+		<script>
+			var log = document.querySelector('#log');
+			['log','warn','error'].forEach(function (verb) {
+				console[verb] = (function (method, verb, log) {
+					return function (text) {
+						method(text);
+						// handle distinguishing between methods any way you'd like
+						var msg = document.createElement('code');
+						msg.classList.add(verb);
+						msg.textContent = verb + ': ' + text;
+						log.appendChild(msg);
+					};
+				})(console[verb].bind(console), verb, log);
+			});
+		</script>
+		<script type="text/javascript" src="jquery-1.11.2.min.js"></script>
+		<script type="text/javascript" src="jquery-ui.min.js"></script>
+		<script type="text/javascript" src="jquery.switchButton.js"></script>
+		<script type="text/javascript" src="jquery.slimscroll.min.js"></script>
+		<script type="text/javascript" src="farbtastic.js"></script>
+		<script type="text/javascript" src="Glow.js"></script>
+	</body>
+</html>

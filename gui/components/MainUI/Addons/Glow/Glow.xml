@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Component xmlns="http://www.red5studios.com/"
+xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+xsi:schemaLocation="http://www.red5studios.com/ ../../../schemas/component.xsd">
+	<Info
+		title="Glow"
+		author="freakbyte"
+		description="Not very descriptive"
+		url="http://freakbyte.me"
+		uiVersion="1000"
+	/>
+
+	<Events>
+		<Event name="ON_COMPONENT_LOAD" 		bind="OnComponentLoad"/>
+		<Event name="ON_PLAYER_READY"           	bind="OnPlayerReady" />
+		<Event name="LIBGLOW_ANNOUNCE" 			bind="LibGlowAnnounce"/>
+		<Event name="LIBGLOW_IGNITE" 				bind="LibGlowIgnite"/>
+	</Events>
+	
+	<textures>
+		<Texture name="Glow" src="./ui/glow.png" premultiplied="false"/>
+		<Texture name="Text" src="./ui/glow_text.png" premultiplied="false"/>
+	</textures>
+
+	<Frames>
+		<WebFrame name="WebFrame" dimensions="width:680; height:430; top: 100; left: 100;" type-target="true" showloading="true"  enable-plugins="true" permanent="true">
+			<Children>
+				<Self dimensions="dock:fill" style="shadow:0;"/>
+			</Children>
+			<OnEscape bind="OnEscape"/>
+		</WebFrame>
+	</Frames>
+	
+</Component>

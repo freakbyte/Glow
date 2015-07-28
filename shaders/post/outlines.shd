@@ -1,0 +1,157 @@
+!shadercode
+
+<vertexshader>
+
+void main(
+	float4 pos : POSITION,
+	float2 texcoord : TEXCOORD0,
+	out float4 outPos : POSITION,
+	out float2 outTex : TEXCOORD0
+)
+{
+	outPos = pos;
+	outTex = texcoord;
+}
+
+</vertexshader>
+
+<pixelglobals>
+	<texture2D name="DepthBufferTex" value="$DepthBuffer" uMode="TEXADDR_WRAP" vMode="TEXADDR_WRAP" wMode="TEXADDR_WRAP" minFilter="TEXFILTER_LINEAR" magFilter="TEXFILTER_LINEAR" mipFilter="TEXFILTER_POINT" maxMipLevel="0" mipBias="0" srgbTexture="0" />
+	<texture2D name="OutlineColors" minFilter="TEXFILTER_POINT" magFilter="TEXFILTER_POINT" mipFilter="TEXFILTER_POINT" />
+	<vec2      name="OutlineScale" />
+	<float     name="EditorOutlinePulsing" />
+</pixelglobals>
+
+<pixelshader>
+
+sampler2D RT2 : register(s0);	// {diffuse.rgb, specular}
+								//  diffuse.rgb for outlined objects = outline color
+
+
+static float4 Glow = float4(0, 0, 0, 1);
+					
+half4 OutlineEditor(float2 texcoord, float cpd, float colorIdx)
+{
+	float2 s = rd_ViewportScale * rd_InverseRenderTargetSize;
+
+	float4 depth1 = float4(GetLinearDepth(texcoord + float2(s.x,   0), DepthBufferTex) + GetLinearDepth(texcoord + float2(-s.x,   0), DepthBufferTex),
+						   GetLinearDepth(texcoord + float2(  0, s.y), DepthBufferTex) + GetLinearDepth(texcoord + float2(   0,-s.y), DepthBufferTex),
+						   GetLinearDepth(texcoord + float2(s.x, s.y), DepthBufferTex) + GetLinearDepth(texcoord + float2(-s.x,-s.y), DepthBufferTex),
+						   GetLinearDepth(texcoord + float2(s.x,-s.y), DepthBufferTex) + GetLinearDepth(texcoord + float2(-s.x, s.y), DepthBufferTex));
+
+	s *= 2;
+	
+	float4 depth2 = float4(GetLinearDepth(texcoord + float2(s.x,   0), DepthBufferTex) + GetLinearDepth(texcoord + float2(-s.x,   0), DepthBufferTex),
+						   GetLinearDepth(texcoord + float2(  0, s.y), DepthBufferTex) + GetLinearDepth(texcoord + float2(   0,-s.y), DepthBufferTex),
+						   GetLinearDepth(texcoord + float2(s.x, s.y), DepthBufferTex) + GetLinearDepth(texcoord + float2(-s.x,-s.y), DepthBufferTex),
+						   GetLinearDepth(texcoord + float2(s.x,-s.y), DepthBufferTex) + GetLinearDepth(texcoord + float2(-s.x, s.y), DepthBufferTex));
+
+	float edgeAlpha = dot(saturate((depth1 - 2 * cpd) * 0.2) +
+						  saturate((depth2 - 2 * cpd) * 0.2), 0.15);
+						  
+	float pulseAmplitude = EditorOutlinePulsing * (2 - EditorOutlinePulsing);
+	float pulseSin = max(0.5 + 0.5 * sin(rd_Time * 4) - (1 - EditorOutlinePulsing), 0);
+	float pulse = (pulseSin * pulseAmplitude + max(EditorOutlinePulsing - 1, 0)) * 3 * (colorIdx > 0 ? 1 : 0);
+	
+	if (edgeAlpha < 0.01)
+		return half4(pulse, pulse, pulse, 0.005);
+	else
+		pulse *= 0.005 / edgeAlpha;
+
+	// Only support 0 (black) and 1 (red)
+	return half4(colorIdx + pulse, pulse, pulse, edgeAlpha);	
+}
+
+float SampleDepthSobel(float cpd, float2 texcoord, float2 edgeOffset, in float2 offset)
+{
+	// Doing max with cpd prevent double lines when a character is rendered on top of an other character
+	return max(cpd, GetLinearDepth(texcoord + edgeOffset * offset, DepthBufferTex));
+}
+
+float OutlineAlphaSobel(float2 texcoord, float2 vpos, float cpd, float colorIdx)
+{
+	float EdgeWidth = lerp(0.001,0.0,saturate(cpd / 20));
+	const float2 edgeOffset = EdgeWidth * OutlineScale;
+
+	// We are sampling the corners twice but the compiler is smart enough to optimize that	
+	float Gx =  -1 * SampleDepthSobel(cpd, texcoord, edgeOffset, float2(-1,-1)) +
+				-2 * SampleDepthSobel(cpd, texcoord, edgeOffset, float2(-1, 0)) +
+				-1 * SampleDepthSobel(cpd, texcoord, edgeOffset, float2(-1, 1)) +
+				 1 * SampleDepthSobel(cpd, texcoord, edgeOffset, float2( 1,-1)) +
+				 2 * SampleDepthSobel(cpd, texcoord, edgeOffset, float2( 1, 0)) +
+				 1 * SampleDepthSobel(cpd, texcoord, edgeOffset, float2( 1, 1));
+	
+	float Gy =  -1 * SampleDepthSobel(cpd, texcoord, edgeOffset, float2(-1,-1)) +
+				-2 * SampleDepthSobel(cpd, texcoord, edgeOffset, float2( 0,-1)) +
+				-1 * SampleDepthSobel(cpd, texcoord, edgeOffset, float2( 1,-1)) +
+				 1 * SampleDepthSobel(cpd, texcoord, edgeOffset, float2(-1, 1)) +
+				 2 * SampleDepthSobel(cpd, texcoord, edgeOffset, float2( 0, 1)) +
+				 1 * SampleDepthSobel(cpd, texcoord, edgeOffset, float2( 1, 1));
+	
+	// Dividing by cpd (center pixel depth) here is equivalent to dividing each individual depth tap by
+	// the cpd. This produces better results since the depth values are now relative to cpd.
+	float alphaEdge = sqrt(Gx * Gx + Gy * Gy) / cpd;
+	
+	[branch]
+	if(colorIdx != 0) 
+	{
+		//const float2 screenPixelCoord = (vpos + 0.5) * rd_ViewportSize.zw;
+		const float2 screenPixelCoord = (vpos + 0.5) * rd_ViewportSize.zw;
+		float3 pView = float3( (screenPixelCoord - 0.5) * rd_PixelToViewSpace, 1.0 ) * (-cpd.x);
+		float3 p = 5 * mul(float4( pView, 1 ), rd_InverseViewMatrix);
+		// sin(p.z*100)										is the scanlines
+		// fmod(p.z											is the fade
+		// + 1e5 - fmod(rd_Time*2 + sin(rd_Time), 1e4)		scrolls the fade upwards, but makes sure as to not every become too big, as that would break the fade.
+		//  12)-10)*0.5)									controls how frequently the fade shows up. 
+		alphaEdge += 0.07f * saturate(0.2f * sin(p.z*100) * saturate((10-cpd)/10) + 0.5f * (fmod(p.z + 1e5 - fmod(rd_Time*2 + sin(rd_Time), 1e4), 12)-10));
+	}
+	
+	return saturate(2 * pow(alphaEdge, 0.7) - 0.2) * 0.8;
+}
+
+half4 main( float2 texcoord : texcoord0, float2 vpos : VPOS ) : COLOR0
+{
+	// Sample the current pixel 's depth
+	float cpd = GetLinearDepth(texcoord, DepthBufferTex);
+	float colorIdx = floor(tex2D(RT2, texcoord).w);
+
+#if POST_PARAMS_BIT0	// Toggleable with rd.editorStyleOutlines
+		return OutlineEditor(texcoord, cpd, colorIdx);
+#else
+		float edgeAlpha = OutlineAlphaSobel(texcoord, vpos, cpd, colorIdx);
+		if (colorIdx <= 10)
+		{
+			
+			// The color texture is generated by "CreateOutlinesTexture" console command
+			// Width of outlineColors.dds in px ~freak
+			const float numColors = 11;
+			half3 edgeColor = tex2D( OutlineColors, (colorIdx + 0.5f) / numColors);	
+			return half4(edgeColor, edgeAlpha);
+		}
+		else
+		{
+			float data = colorIdx + 10;	
+			float Hue = floor(data / 10.0);
+			float Intensity = (data - (Hue * 10.0));
+			
+			if (Intensity < 1.0)
+			{
+				Intensity = 1;
+			}
+				
+			Intensity = (1.0 + (Intensity-1.0) * 10.0);
+					
+			float H =  Hue / 360;
+			float R = abs(H * 6 - 3) - 1;
+			float G = 2 - abs(H * 6 - 2);
+			float B = 2 - abs(H * 6 - 4);
+			
+			return half4(R, G, B, edgeAlpha * Intensity);
+				
+		}
+
+#endif
+}
+
+</pixelshader>
+
